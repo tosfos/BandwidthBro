@@ -85,16 +85,17 @@ initialize() {
     log_dir=$(dirname "${LOGFILE}")
     if [[ ! -d "${log_dir}" ]]; then
         if ! mkdir -p "${log_dir}"; then
-            echo "Error: Could not create log directory ${log_dir}" >&2
+            echo "Error: Could not create log directory ${log_dir}. Try running with sudo if this is a permissions issue." >&2
             exit 1
         fi
     fi
     if [[ ! -w "${log_dir}" ]]; then
-        echo "Error: Log directory ${log_dir} is not writable" >&2
+        echo "Error: Log directory ${log_dir} is not writable. Try running with sudo if this is a permissions issue." >&2
         exit 1
     fi
     log_color "Internet Debug Script started at ${TIMESTAMP_START}" "${GREEN}"
     log "Logging to ${LOGFILE}"
+    log_color "Note: Some diagnostics require root privileges. Run with 'sudo' for complete results if you encounter permission issues." "${YELLOW}"
 }
 
 # Test internet speed using speedtest-cli if available, otherwise fallback
@@ -294,7 +295,7 @@ check_router_status() {
     log "Checking for router status messages..."
     # Check dmesg for network-related messages (requires sudo for full access, may be limited)
     if ! ROUTER_MESSAGES=$(dmesg | grep -i 'wlan\|wifi\|network\|dhcp\|internet' | tail -n 5 2>/dev/null); then
-        log "Unable to access system messages (may require sudo)"
+        log_color "Unable to access system messages (may require sudo). Run script with 'sudo' for full system diagnostics." "${YELLOW}"
         return 1
     fi
     if [[ -n "${ROUTER_MESSAGES}" ]]; then
@@ -366,13 +367,13 @@ check_tools() {
     local cmd missing_tools=()
     for cmd in ping curl dig iwconfig traceroute netstat; do
         if ! command -v "${cmd}" &> /dev/null; then
-            log_color "Error: ${cmd} is not installed. Please install it before running this script." "${RED}"
-            log_color "See README.md for installation instructions." "${RED}"
+            log_color "Warning: ${cmd} is not installed. Some tests will be skipped. Install it for full diagnostics." "${YELLOW}"
+            log_color "See README.md for installation instructions." "${YELLOW}"
             missing_tools+=("${cmd}")
         fi
     done
     if [[ ${#missing_tools[@]} -gt 0 ]]; then
-        exit 1
+        log_color "Script will continue with limited functionality. Install missing tools or run with sudo if permissions are the issue." "${YELLOW}"
     fi
 
     # Check for speedtest-cli if available
