@@ -9,7 +9,12 @@ set -uo pipefail
 
 # CONFIGURATION - Can be overridden by environment variables or config file
 CONFIG_FILE="${CONFIG_FILE:-/etc/bandwidth_bro.conf}"
-LOGFILE="${LOGFILE:-${HOME}/bandwidth_bro.log}"
+# Use the original user's home directory for logging, even with sudo
+if [[ -n "${SUDO_USER}" ]]; then
+    LOGFILE="${LOGFILE:-/home/${SUDO_USER}/bandwidth_bro.log}"
+else
+    LOGFILE="${LOGFILE:-${HOME}/bandwidth_bro.log}"
+fi
 TEST_HOST="${TEST_HOST:-8.8.8.8}" # Google DNS for ping test
 TEST_HOST2="${TEST_HOST2:-1.1.1.1}" # Cloudflare DNS as secondary test host
 TEST_HOST3="${TEST_HOST3:-208.67.222.222}" # OpenDNS as tertiary test host
