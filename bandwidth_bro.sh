@@ -240,7 +240,12 @@ test_bandwidth() {
             RX_SPEED=$(echo "scale=2; ${RX_DIFF} / ${TIME_DIFF} / 1024" | bc 2>/dev/null || echo "0.00")
             TX_SPEED=$(echo "scale=2; ${TX_DIFF} / ${TIME_DIFF} / 1024" | bc 2>/dev/null || echo "0.00")
 
+            # Explicitly ensure the value is displayed, even if it's 0.00
+            if [[ -z "${RX_SPEED}" ]]; then
+                RX_SPEED="0.00"
+            fi
             log "Bandwidth usage: Download ${RX_SPEED} KB/s, Upload ${TX_SPEED} KB/s"
+            debug_log "RX_SPEED calculated as: ${RX_SPEED}, TX_SPEED as: ${TX_SPEED}"
         fi
     else
         log "Bandwidth usage: Time difference too small to calculate speed"
