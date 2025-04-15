@@ -3,8 +3,9 @@
 # Script to debug unstable internet connection
 # Credit: Ike Hecht (tosfos on GitHub)
 
-# Exit on error, unset variables, and pipe failures
-set -euo pipefail
+# Exit on unset variables and pipe failures, but NOT on command errors to prevent unexpected exits
+set -uo pipefail
+# Explicitly NOT using 'set -e' to prevent script from exiting on command failure
 
 # CONFIGURATION - Can be overridden by environment variables or config file
 CONFIG_FILE="${CONFIG_FILE:-/etc/bandwidth_bro.conf}"
@@ -29,19 +30,28 @@ NC='\033[0m' # No Color
 # Global variables
 SPEEDTEST_AVAILABLE=false
 TIMESTAMP_START=$(date '+%Y-%m-%d %H:%M:%S')
+ERROR_COUNT=0
 
 # Function to log messages with consistent formatting
 log() {
     local CURRENT_TIME
     CURRENT_TIME=$(date '+%Y-%m-%d %H:%M:%S')
-    echo -e "${CURRENT_TIME}: $1" | tee -a "${LOGFILE}"
+    echo -e "${CURRENT_TIME}: $1" | tee -a "${LOGFILE}" 2>/dev/null || echo "${CURRENT_TIME}: $1"
 }
 
 # Function to log with color for terminal visibility
 log_color() {
     local CURRENT_TIME
     CURRENT_TIME=$(date '+%Y-%m-%d %H:%M:%S')
-    echo -e "${2}${CURRENT_TIME}: $1${NC}" | tee -a "${LOGFILE}"
+    echo -e "${2}${CURRENT_TIME}: $1${NC}" | tee -a "${LOGFILE}" 2>/dev/null || echo "${CURRENT_TIME}: $1"
+}
+
+# Function to log errors and track them without exiting
+log_error() {
+    local CURRENT_TIME
+    CURRENT_TIME=$(date '+%Y-%m-%d %H:%M:%S')
+    ((ERROR_COUNT++))
+    echo -e "${RED}${CURRENT_TIME}: ERROR (${ERROR_COUNT}): $1${NC}" | tee -a "${LOGFILE}" 2>/dev/null || echo "${CURRENT_TIME}: ERROR (${ERROR_COUNT}): $1"
 }
 
 # Debug logging function - only outputs if DEBUG_MODE is true
@@ -55,7 +65,7 @@ debug_log() {
 load_config() {
     if [[ -f "${CONFIG_FILE}" ]]; then
         debug_log "Loading configuration from ${CONFIG_FILE}"
-        source "${CONFIG_FILE}"
+        source "${CONFIG_FILE}" 2>/dev/null || log_color "Warning: Could not load config file ${CONFIG_FILE}, continuing with default settings" "${YELLOW}"
     fi
 }
 
@@ -84,18 +94,18 @@ initialize() {
     local log_dir
     log_dir=$(dirname "${LOGFILE}")
     if [[ ! -d "${log_dir}" ]]; then
-        if ! mkdir -p "${log_dir}"; then
-            echo "Error: Could not create log directory ${log_dir}. Try running with sudo if this is a permissions issue." >&2
-            exit 1
+        if ! mkdir -p "${log_dir}" 2>/dev/null; then
+            log_color "Warning: Could not create log directory ${log_dir}. Try running with sudo if this is a permissions issue. Will attempt to log to console only." "${YELLOW}"
+            LOGFILE="/dev/stdout"
         fi
     fi
     if [[ ! -w "${log_dir}" ]]; then
-        echo "Error: Log directory ${log_dir} is not writable. Try running with sudo if this is a permissions issue." >&2
-        exit 1
+        log_color "Warning: Log directory ${log_dir} is not writable. Try running with sudo if this is a permissions issue. Will attempt to log to console only." "${YELLOW}"
+        LOGFILE="/dev/stdout"
     fi
     log_color "Internet Debug Script started at ${TIMESTAMP_START}" "${GREEN}"
     log "Logging to ${LOGFILE}"
-    log_color "Note: Some diagnostics require root privileges. Run with 'sudo' for complete results if you encounter permission issues." "${YELLOW}"
+    log_color "Note: Some diagnostics require root privileges. Run with 'sudo' for complete results if you encounter permission issues. Script will continue with available tests." "${YELLOW}"
 }
 
 # Test internet speed using speedtest-cli if available, otherwise fallback
@@ -302,7 +312,7 @@ check_router_status() {
     log "Checking for router status messages..."
     # Check dmesg for network-related messages (requires sudo for full access, may be limited)
     if ! ROUTER_MESSAGES=$(dmesg | grep -i 'wlan\|wifi\|network\|dhcp\|internet' | tail -n 5 2>/dev/null); then
-        log_color "Unable to access system messages (may require sudo). Run script with 'sudo' for full system diagnostics." "${YELLOW}"
+        log_color "Unable to access system messages (may require sudo). Run script with 'sudo' for full system diagnostics. Continuing with other tests..." "${YELLOW}"
         return 1
     fi
     if [[ -n "${ROUTER_MESSAGES}" ]]; then
