@@ -210,19 +210,26 @@ test_bandwidth() {
     # Calculate difference and speed
     TIME_DIFF=$((CURRENT_TIME - PREV_TIME))
     if [[ "${TIME_DIFF}" -gt 0 ]]; then
-        # Use bc for floating point arithmetic to handle large numbers
-        RX_DIFF=$(echo "${CURRENT_RX} - ${PREV_RX}" | bc)
-        TX_DIFF=$(echo "${CURRENT_TX} - ${PREV_TX}" | bc)
-        RX_SPEED=$(echo "scale=2; ${RX_DIFF} / ${TIME_DIFF} / 1024" | bc) # KB/s
-        TX_SPEED=$(echo "scale=2; ${TX_DIFF} / ${TIME_DIFF} / 1024" | bc) # KB/s
+        # Check if we have valid numbers before calculation
+        if [[ -z "${CURRENT_RX}" || -z "${PREV_RX}" || -z "${CURRENT_TX}" || -z "${PREV_TX}" ]]; then
+            log "Bandwidth usage: Unable to calculate - invalid data from network statistics"
+        else
+            # Use bc for floating point arithmetic to handle large numbers
+            RX_DIFF=$(echo "${CURRENT_RX} - ${PREV_RX}" | bc 2>/dev/null || echo "0")
+            TX_DIFF=$(echo "${CURRENT_TX} - ${PREV_TX}" | bc 2>/dev/null || echo "0")
+            RX_SPEED=$(echo "scale=2; ${RX_DIFF} / ${TIME_DIFF} / 1024" | bc 2>/dev/null || echo "0.00")
+            TX_SPEED=$(echo "scale=2; ${TX_DIFF} / ${TIME_DIFF} / 1024" | bc 2>/dev/null || echo "0.00")
 
-        log "Bandwidth usage: Download ${RX_SPEED} KB/s, Upload ${TX_SPEED} KB/s"
+            log "Bandwidth usage: Download ${RX_SPEED} KB/s, Upload ${TX_SPEED} KB/s"
+        fi
     else
         log "Bandwidth usage: Time difference too small to calculate speed"
     fi
 
-    # Store current values for next check
-    echo "${CURRENT_RX} ${CURRENT_TX}" > /tmp/bandwidth_prev
+    # Store current values for next check, only if they're valid
+    if [[ -n "${CURRENT_RX}" && -n "${CURRENT_TX}" ]]; then
+        echo "${CURRENT_RX} ${CURRENT_TX}" > /tmp/bandwidth_prev
+    fi
     return 0
 }
 
