@@ -1,4 +1,8 @@
-# README for Bandwidth Bro
+# Bandwidth Bro
+
+A script to debug unstable internet connections.
+
+<img src="mascot.png" alt="Bandwidth Bro Mascot" width="400">
 
 ## Overview
 
