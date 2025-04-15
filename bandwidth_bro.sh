@@ -397,6 +397,29 @@ log_dns_config() {
     return 0
 }
 
+# Check if current time matches a condition for periodic tests
+check_time_condition() {
+    local format="$1"  # Format for date command (%M for minutes, %S for seconds)
+    local condition="$2"  # Condition to check (e.g., "< 30" or "% 2 == 0")
+    local value
+
+    value=$(date "+$format")
+    if [[ "$condition" == *"%"* ]]; then
+        # Handle modulo operations
+        local modulo_result=$(echo "$condition" | cut -d' ' -f2)
+        if (( 10#$value % $modulo_result == 0 )); then
+            return 0  # True, condition met
+        fi
+    else
+        # Handle less than comparisons
+        local threshold=$(echo "$condition" | cut -d' ' -f2)
+        if (( 10#$value < $threshold )); then
+            return 0  # True, condition met
+        fi
+    fi
+    return 1  # False, condition not met
+}
+
 # Main test loop
 main_loop() {
     debug_log "Starting main test loop"
@@ -430,7 +453,7 @@ main_loop() {
         fi
 
         # Test 2b: Alternate DNS server test (every minute for comparison)
-        if (( $(date +%S) < 30 )); then
+        if check_time_condition "%S" "< 30"; then
             test_alternate_dns
         fi
 
@@ -474,7 +497,7 @@ main_loop() {
         fi
 
         # Test 6: Check first hop beyond gateway (every minute)
-        if (( $(date +%S) < 30 )); then
+        if check_time_condition "%S" "< 30"; then
             test_first_hop_beyond_gateway
         fi
 
@@ -482,22 +505,22 @@ main_loop() {
         check_wifi_signal
 
         # Test 8: Check router status messages (every minute)
-        if (( $(date +%S) < 30 )); then
+        if check_time_condition "%S" "< 30"; then
             check_router_status
         fi
 
         # Test 9: Test for MTU issues (every 2 minutes)
-        if (( $(date +%M) % 2 == 0 )); then
+        if check_time_condition "%M" "% 2 == 0"; then
             test_mtu_issues
         fi
 
         # Test 10: Speed test (runs every SPEED_TEST_INTERVAL minutes)
-        if (( $(date +%M) % SPEED_TEST_INTERVAL == 0 )); then
+        if check_time_condition "%M" "% $SPEED_TEST_INTERVAL == 0"; then
             test_speed
         fi
 
         # Test 11: Traceroute (runs every TRACEROUTE_INTERVAL minutes)
-        if (( $(date +%M) % TRACEROUTE_INTERVAL == 0 )); then
+        if check_time_condition "%M" "% $TRACEROUTE_INTERVAL == 0"; then
             test_traceroute
         fi
 
