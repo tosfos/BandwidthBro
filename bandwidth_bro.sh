@@ -209,10 +209,11 @@ test_bandwidth() {
     # Calculate difference and speed
     TIME_DIFF=$((CURRENT_TIME - PREV_TIME))
     if [[ "${TIME_DIFF}" -gt 0 ]]; then
-        RX_DIFF=$((CURRENT_RX - PREV_RX))
-        TX_DIFF=$((CURRENT_TX - PREV_TX))
-        RX_SPEED=$((RX_DIFF / TIME_DIFF / 1024)) # KB/s
-        TX_SPEED=$((TX_DIFF / TIME_DIFF / 1024)) # KB/s
+        # Use bc for floating point arithmetic to handle large numbers
+        RX_DIFF=$(echo "${CURRENT_RX} - ${PREV_RX}" | bc)
+        TX_DIFF=$(echo "${CURRENT_TX} - ${PREV_TX}" | bc)
+        RX_SPEED=$(echo "scale=2; ${RX_DIFF} / ${TIME_DIFF} / 1024" | bc) # KB/s
+        TX_SPEED=$(echo "scale=2; ${TX_DIFF} / ${TIME_DIFF} / 1024" | bc) # KB/s
 
         log "Bandwidth usage: Download ${RX_SPEED} KB/s, Upload ${TX_SPEED} KB/s"
     else
