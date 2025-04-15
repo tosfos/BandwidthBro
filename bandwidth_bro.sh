@@ -10,6 +10,8 @@ set -uo pipefail
 # CONFIGURATION - Can be overridden by environment variables or config file
 CONFIG_FILE="${CONFIG_FILE:-/etc/bandwidth_bro.conf}"
 # Use the original user's home directory for logging, even with sudo
+# Safely handle SUDO_USER with a default of empty string if unset
+SUDO_USER=${SUDO_USER:-}
 if [[ -n "${SUDO_USER}" ]]; then
     LOGFILE="${LOGFILE:-/home/${SUDO_USER}/bandwidth_bro.log}"
 else
@@ -110,7 +112,10 @@ initialize() {
     fi
     log_color "Internet Debug Script started at ${TIMESTAMP_START}" "${GREEN}"
     log "Logging to ${LOGFILE}"
-    log_color "Note: Some diagnostics require root privileges. Run with 'sudo' for complete results if you encounter permission issues. Script will continue with available tests." "${YELLOW}"
+    # Only show the sudo note if not running as root
+    if [[ $EUID -ne 0 ]]; then
+        log_color "Note: Some diagnostics require root privileges. Run with 'sudo' for complete results if you encounter permission issues. Script will continue with available tests." "${YELLOW}"
+    fi
 }
 
 # Test internet speed using speedtest-cli if available, otherwise fallback
